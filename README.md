@@ -109,15 +109,35 @@ All inserts and lookups in C# use parameterised queries (`@name` parameters) to 
 ## Project structure
 
 ```
-WarSim/
+WarSim/                          (repo root, push this to GitHub)
 ├── README.md
-├── Database/schema.sql
-├── WarSim/
+├── .gitignore
+├── WarSim.sln
+├── Database/
+│   └── schema.sql
+├── WarSim/                      (console app project)
+│   ├── WarSim.csproj
 │   ├── Program.cs
 │   ├── Models/
+│   │   ├── Team.cs              enum Team { Red, Blue }
+│   │   ├── EventType.cs         enum EventType { Moved, Captured, Blocked, Collision }
+│   │   ├── IMovable.cs          interface
+│   │   ├── Unit.cs              abstract base class
+│   │   ├── Scout.cs
+│   │   ├── Vehicle.cs
+│   │   ├── Infantry.cs
+│   │   └── Cell.cs
 │   ├── Core/
+│   │   ├── Grid.cs
+│   │   ├── Simulation.cs
+│   │   ├── SimulationEvent.cs
+│   │   └── OutOfBoundsException.cs
 │   └── Data/
-└── WarSim.Tests/
+│       └── SimulationRepository.cs   all MySQL code
+└── WarSim.Tests/                (xUnit test project)
+    ├── WarSim.Tests.csproj
+    ├── GridTests.cs
+    └── SimulationTests.csS
 ```
 
 ## What I would improve next
