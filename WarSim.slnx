@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/WarSim.Console/WarSim.Console.csproj" />
     <Project Path="src/WarSim.Core/WarSim.Core.csproj" />
+    <Project Path="src/WarSim.Persistence/WarSim.Persistence.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/WarSim.Tests/WarSim.Tests.csproj" />

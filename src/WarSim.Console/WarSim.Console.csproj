@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\WarSim.Core\WarSim.Core.csproj" />
+    <ProjectReference Include="..\WarSim.Persistence\WarSim.Persistence.csproj" />
   </ItemGroup>
 </Project>
