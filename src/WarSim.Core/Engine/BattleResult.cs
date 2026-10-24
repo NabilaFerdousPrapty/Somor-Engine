@@ -11,4 +11,5 @@ public record BattleResult(
     int TurnsPlayed,
     int BlueCasualties,
     int RedCasualties,
-    IReadOnlyList<BattleEvent> Events);
+    IReadOnlyList<BattleEvent> Events,
+    IReadOnlyList<TurnSnapshot> Snapshots);

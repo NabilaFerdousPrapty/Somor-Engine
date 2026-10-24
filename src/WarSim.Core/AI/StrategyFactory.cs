@@ -6,6 +6,7 @@ public static class StrategyFactory
     {
         "aggressive" => new AggressiveStrategy(),
         "defensive" => new DefensiveStrategy(),
-        _ => throw new ArgumentException($"Unknown strategy '{name}'. Use Aggressive or Defensive.")
+        "balanced" => new BalancedStrategy(),
+        _ => throw new ArgumentException($"Unknown strategy '{name}'. Use Aggressive, Defensive or Balanced.")
     };
 }

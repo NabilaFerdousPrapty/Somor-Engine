@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WarSim</title>
+<style>
+:root{
+  --bg:#f4f4f0;--card:#ffffff;--fg:#1d1d1a;--muted:#6c6c66;--line:#e1e1da;
+  --blue:#2f5fd0;--blue2:#4c7df0;--red:#cc3b2f;--red2:#ea5a4d;
+  --good:#3a8a3a;--warn:#c98a00;--bad:#cc3b2f;
+  --p:#f1f1ea;--f:#d3e7cc;--h:#ead9b2;--w:#c8e0f2;--accent:#2f5fd0;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 6px 20px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141413;--card:#1f1f1d;--fg:#ecece6;--muted:#9b9b93;--line:#33332f;
+  --blue:#6b8fff;--blue2:#4f74f0;--red:#ff6b5e;--red2:#e24c3f;
+  --good:#5fbf5f;--warn:#e0a82e;--bad:#ff6b5e;
+  --p:#2a2a27;--f:#2b472b;--h:#4a3f28;--w:#244559;--accent:#6b8fff;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.top{max-width:1100px;margin:0 auto;padding:26px 20px 6px}
+.top h1{margin:0;font-size:28px;letter-spacing:-.5px}
+.top p{margin:2px 0 0;color:var(--muted)}
+.layout{max-width:1100px;margin:0 auto;padding:14px 20px 40px;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+.card h2{margin:0 0 12px;font-size:16px}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.wide{grid-column:1/-1}
+
+.battle-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.turn{font-size:22px;font-weight:700}
+.turn small{color:var(--muted);font-weight:500;font-size:14px}
+#banner{font-weight:600}
+.badge{display:inline-block;padding:3px 12px;border-radius:999px;color:#fff;font-size:13px;font-weight:700}
+.badge.Blue{background:var(--blue)}.badge.Red{background:var(--red)}.badge.Draw{background:#8d8d85}
+.boardwrap{overflow:auto;padding:4px 0 4px}
+#board{position:relative;margin:0 auto;border-radius:12px;overflow:hidden;box-shadow:0 0 0 2px var(--line)}
+#tiles{display:grid}
+.cell{display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--p);color:rgba(0,0,0,.18);box-shadow:inset 0 0 0 1px var(--line)}
+@media (prefers-color-scheme:dark){.cell{color:rgba(255,255,255,.2)}}
+.cell.tF{background:var(--f)}
+.cell.tH{background:var(--h)}
+.cell.tW{background:repeating-linear-gradient(135deg,var(--w) 0 8px,rgba(255,255,255,.18) 8px 10px)}
+#tokens{position:absolute;inset:0;pointer-events:none}
+.token{position:absolute;left:0;top:0;width:56px;height:56px;display:flex;align-items:center;justify-content:center;
+  transition:transform .45s ease,opacity .6s ease}
+.token.gone{opacity:0}
+.disc{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;
+  border:2px solid rgba(255,255,255,.85);box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .5s ease}
+.token.blue .disc{background:radial-gradient(circle at 30% 30%,var(--blue2),var(--blue))}
+.token.red .disc{background:radial-gradient(circle at 30% 30%,var(--red2),var(--red))}
+.token.gone .disc{transform:scale(.3)}
+.token.hit .disc{animation:shake .32s}
+.hpbar{position:absolute;left:9px;right:9px;bottom:3px;height:5px;border-radius:3px;background:rgba(0,0,0,.35);overflow:hidden}
+.hpbar b{display:block;height:100%;transition:width .4s ease}
+.float{position:absolute;top:0;left:50%;transform:translateX(-50%);background:var(--bad);color:#fff;font-weight:800;font-size:12px;padding:1px 7px;border-radius:9px;animation:rise .9s ease-out forwards;z-index:5}
+@keyframes rise{from{opacity:1;transform:translate(-50%,0)}to{opacity:0;transform:translate(-50%,-36px)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.legend{color:var(--muted);font-size:13px;text-align:center;margin-top:8px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
+button,select,input{font:inherit}
+button{padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+select,input[type=number]{padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+input[type=range]{flex:1;min-width:140px;accent-color:var(--accent)}
+#log{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;font-size:14px;min-height:96px}
+#log div{padding:1px 0}
+#log .Death{color:var(--bad);font-weight:700}
+#log .Move{color:var(--muted)}
+#log .Order{color:var(--accent);font-weight:600}
+#note{color:var(--muted);font-size:13px;margin-top:6px}
+
+.order{display:block;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px}
+.order b{display:block}
+.order span{display:block;color:var(--muted);font-size:13px}
+.order.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset;background:rgba(47,95,208,.08)}
+.hint{color:var(--muted);font-size:13px;margin:4px 0 0}
+.field{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.field label{width:90px;color:var(--muted);font-size:14px}
+.field select,.field input{flex:1;min-width:0}
+.urow{display:grid;grid-template-columns:26px 1fr 70px 46px;gap:8px;align-items:center;margin:7px 0;font-size:13.5px}
+.urow.dead{opacity:.4}
+.chip{width:24px;height:24px;border-radius:50%;color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
+.chip.blue{background:var(--blue)}.chip.red{background:var(--red)}
+.hp{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.hp span{display:block;height:100%;transition:width .4s ease}
+.hpnum{text-align:right;color:var(--muted)}
+
+table.matrix{border-collapse:separate;border-spacing:6px;width:100%;table-layout:fixed}
+.matrix th{font-weight:600;font-size:13px;color:var(--muted);padding:4px}
+.matrix td{border-radius:10px;text-align:center;padding:12px 6px;cursor:pointer;border:1px solid var(--line)}
+.matrix td b{display:block;font-size:20px}
+.matrix td span{font-size:12px;opacity:.85}
+.matrix td:hover{outline:2px solid var(--accent)}
+.runrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.small{color:var(--muted);font-size:13px}
+#toast{display:none;position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--bad);color:#fff;padding:10px 16px;border-radius:10px;z-index:20;max-width:90%}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>WarSim</h1>
+  <p>Turn-based tactical simulation. You command the Blue force: change its orders at any turn.</p>
+</header>
+
+<main class="layout">
+  <div class="col">
+    <section class="card">
+      <div class="battle-head">
+        <div class="turn" id="turn">Turn 0</div>
+        <div id="banner"></div>
+      </div>
+      <div class="boardwrap"><div id="board"><div id="tiles"></div><div id="tokens"></div></div></div>
+      <div class="legend">I infantry &nbsp; A armor &nbsp; S recon &nbsp; ♣ forest &nbsp; ▲ hills &nbsp; ≈ water</div>
+      <div class="controls">
+        <button id="btnReset">Reset</button>
+        <button id="btnPrev">Back</button>
+        <button id="btnPlay" class="primary">Play</button>
+        <button id="btnNext">Next turn</button>
+        <input type="range" id="slider" min="0" max="0" value="0">
+        <select id="speed" title="Playback speed">
+          <option value="1100">Slow</option>
+          <option value="700" selected>Normal</option>
+          <option value="350">Fast</option>
+        </select>
+      </div>
+      <div id="note"></div>
+      <div id="log"></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card">
+      <h2>Your orders (Blue)</h2>
+      <button class="order" data-s="Aggressive"><b>Aggressive</b><span>Every unit charges the nearest enemy.</span></button>
+      <button class="order" data-s="Defensive"><b>Defensive</b><span>Hold good terrain, fire when enemies come close.</span></button>
+      <button class="order" data-s="Balanced"><b>Balanced</b><span>Infantry hold ground, armor and recon hunt.</span></button>
+      <p class="hint">Orders apply from the next turn. Keys: A, D, B. Space = play/pause, arrows = step.</p>
+    </section>
+
+    <section class="card">
+      <h2>Battle setup</h2>
+      <div class="field"><label for="red">Enemy (Red)</label>
+        <select id="red"><option>Aggressive</option><option>Defensive</option><option>Balanced</option></select></div>
+      <div class="field"><label for="seed">Seed</label>
+        <input type="number" id="seed" value="42"></div>
+      <div class="controls" style="margin-top:0">
+        <button id="btnNew" class="primary">New battle</button>
+        <button id="btnRandom">Random seed</button>
+      </div>
+      <p class="hint">The same seed always gives the same battle.</p>
+    </section>
+
+    <section class="card">
+      <h2>Units</h2>
+      <div id="units"></div>
+    </section>
+  </div>
+
+  <section class="card wide">
+    <h2>Which strategy wins?</h2>
+    <div class="runrow">
+      <label for="runs" class="small">Battles per pairing</label>
+      <input type="number" id="runs" value="300" min="1" max="2000" style="width:100px">
+      <button id="btnCompare">Run comparison</button>
+      <span class="small">Each cell shows Blue's win rate. Click a cell to watch that matchup.</span>
+    </div>
+    <div id="matrix"></div>
+    <p class="small" id="matrixNote"></p>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const CELL = 56;
+const LETTER = { Infantry: 'I', Armor: 'A', Recon: 'S' };
+const S = { seed: 42, base: 'Defensive', red: 'Aggressive', plan: {}, battle: null, idx: 0, timer: null, active: new Set() };
+const $ = id => document.getElementById(id);
+const tokens = new Map();
+let builtFor = '';
+
+async function api(path) {
+  const r = await fetch(path);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ('Request failed (' + r.status + ')'));
+  return data;
+}
+
+function toast(msg) {
+  const e = $('toast');
+  e.textContent = msg;
+  e.style.display = 'block';
+  setTimeout(() => { e.style.display = 'none'; }, 4000);
+}
+
+function planKeys() { return Object.keys(S.plan).map(Number).sort((a, b) => a - b); }
+function switchesParam() { return planKeys().map(t => t + ':' + S.plan[t]).join(','); }
+
+// Which orders Blue follows during a given turn.
+function ordersFor(turn) {
+  let cur = S.base;
+  planKeys().forEach(t => { if (t <= turn) cur = S.plan[t]; });
+  return cur;
+}
+
+async function loadBattle(animate) {
+  try {
+    const q = '/api/battle?seed=' + S.seed + '&blue=' + S.base + '&red=' + S.red +
+              '&switches=' + encodeURIComponent(switchesParam());
+    S.battle = await api(q);
+  } catch (e) { toast(e.message); return; }
+  const last = S.battle.snapshots.length - 1;
+  S.idx = Math.min(S.idx, last);
+  S.active = new Set(S.battle.events.filter(e => e.eventType !== 'Order').map(e => e.turn));
+  buildBoard();
+  $('slider').max = last;
+  render(!!animate);
+}
+
+function buildBoard() {
+  const m = S.battle.map;
+  const key = m.join('/');
+  if (key === builtFor) return;
+  builtFor = key;
+  const H = m.length, W = m[0].length;
+  const board = $('board');
+  board.style.width = (W * CELL) + 'px';
+  board.style.height = (H * CELL) + 'px';
+  const tiles = $('tiles');
+  tiles.innerHTML = '';
+  tiles.style.gridTemplateColumns = 'repeat(' + W + ', ' + CELL + 'px)';
+  tiles.style.gridAutoRows = CELL + 'px';
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const l = m[y][x];
+      const c = document.createElement('div');
+      c.className = 'cell t' + l;
+      c.textContent = ({ F: '♣', H: '▲', W: '≈' })[l] || '';
+      tiles.appendChild(c);
+    }
+  }
+  $('tokens').innerHTML = '';
+  tokens.clear();
+}
+
+function posOf(p) { return 'translate(' + (p.x * CELL) + 'px,' + (p.y * CELL) + 'px)'; }
+
+function tokenFor(u) {
+  let el = tokens.get(u.name);
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'token ' + u.side.toLowerCase();
+    el.innerHTML = '<div class="disc"></div><i class="hpbar"><b></b></i>';
+    el.style.transition = 'none';
+    el.style.transform = posOf(u.position);
+    $('tokens').appendChild(el);
+    void el.offsetWidth;
+    el.style.transition = '';
+    tokens.set(u.name, el);
+  }
+  return el;
+}
+
+function floatText(el, text) {
+  const f = document.createElement('div');
+  f.className = 'float';
+  f.textContent = text;
+  el.appendChild(f);
+  setTimeout(() => f.remove(), 900);
+}
+
+function render(animate) {
+  const b = S.battle;
+  const last = b.snapshots.length - 1;
+  const snap = b.snapshots[S.idx];
+
+  // tokens
+  const seen = new Set();
+  snap.units.forEach(u => {
+    const el = tokenFor(u);
+    seen.add(u.name);
+    el.classList.remove('gone');
+    el.style.transform = posOf(u.position);
+    el.querySelector('.disc').textContent = LETTER[u.unitType] || '?';
+    const pct = u.health / u.maxHealth;
+    const bar = el.querySelector('.hpbar b');
+    bar.style.width = (pct * 100) + '%';
+    bar.style.background = pct > 0.5 ? 'var(--good)' : pct > 0.25 ? 'var(--warn)' : 'var(--bad)';
+  });
+
+  // hit effects (before dead tokens are removed)
+  if (animate && snap.turn > 0) {
+    b.events.filter(e => e.turn === snap.turn && e.eventType === 'Attack').forEach((e, i) => {
+      const target = tokens.get(e.targetName);
+      if (!target) return;
+      setTimeout(() => {
+        target.classList.add('hit');
+        floatText(target, '-' + e.damage);
+        setTimeout(() => target.classList.remove('hit'), 350);
+      }, i * 160);
+    });
+  }
+
+  tokens.forEach((el, name) => {
+    if (!seen.has(name)) {
+      el.classList.add('gone');
+      tokens.delete(name);
+      setTimeout(() => el.remove(), 1000);
+    }
+  });
+
+  // header
+  $('turn').innerHTML = 'Turn ' + snap.turn + ' <small>of ' + b.turnLimit + '</small>';
+  $('slider').value = S.idx;
+  const finished = S.idx === last;
+  const lastActive = S.active.size ? Math.max(...S.active) : 0;
+  let banner = '';
+  if (finished) {
+    banner = '<span class="badge ' + b.winner + '">' + (b.winner === 'Draw' ? 'Draw' : b.winner + ' wins') + '</span> ' +
+             '<span class="small">Blue lost ' + b.blueCasualties + ', Red lost ' + b.redCasualties + '</span>';
+  }
+  $('banner').innerHTML = banner;
+
+  let note = '';
+  if (finished && b.turnsPlayed > lastActive) {
+    note = 'No more action after turn ' + lastActive + '. The battle ran to the turn limit, so the winner is decided by remaining health.';
+  } else if (!finished) {
+    note = 'Next turn Blue follows ' + ordersFor(snap.turn + 1) + ' orders.';
+  }
+  $('note').textContent = note;
+
+  // order buttons
+  const current = ordersFor(snap.turn + 1);
+  document.querySelectorAll('.order').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.s === current && !finished);
+    btn.disabled = finished;
+  });
+
+  renderUnits(snap);
+  renderLog(snap);
+}
+
+function renderUnits(snap) {
+  const el = $('units');
+  el.innerHTML = '';
+  S.battle.snapshots[0].units.forEach(st => {
+    const now = snap.units.find(u => u.name === st.name);
+    const pct = now ? now.health / now.maxHealth : 0;
+    const color = pct > 0.5 ? 'var(--good)' : pct > 0.25 ? 'var(--warn)' : 'var(--bad)';
+    const row = document.createElement('div');
+    row.className = 'urow' + (now ? '' : ' dead');
+    row.innerHTML =
+      '<span class="chip ' + st.side.toLowerCase() + '">' + (LETTER[st.unitType] || '?') + '</span>' +
+      '<div>' + st.name + '</div>' +
+      '<div class="hp"><span style="width:' + (pct * 100) + '%;background:' + color + '"></span></div>' +
+      '<div class="hpnum">' + (now ? now.health + '/' + now.maxHealth : 'lost') + '</div>';
+    el.appendChild(row);
+  });
+}
+
+function renderLog(snap) {
+  const el = $('log');
+  el.innerHTML = '';
+  if (snap.turn === 0) {
+    el.innerHTML = '<div class="Move">Start of battle. Choose your orders, then press Next turn or Play.</div>';
+    return;
+  }
+  const list = S.battle.events.filter(e => e.turn === snap.turn);
+  if (list.length === 0) el.innerHTML = '<div class="Move">Nothing happened this turn.</div>';
+  list.forEach(e => {
+    const d = document.createElement('div');
+    d.className = e.eventType;
+    d.textContent = e.description;
+    el.appendChild(d);
+  });
+}
+
+function nextActive(i) {
+  const snaps = S.battle.snapshots;
+  for (let j = i + 1; j < snaps.length; j++) if (S.active.has(snaps[j].turn)) return j;
+  return -1;
+}
+
+function stop() {
+  if (S.timer) { clearInterval(S.timer); S.timer = null; }
+  $('btnPlay').textContent = 'Play';
+}
+
+function play() {
+  if (!S.battle) return;
+  if (S.idx >= S.battle.snapshots.length - 1) { S.idx = 0; render(false); }
+  $('btnPlay').textContent = 'Pause';
+  const tick = () => {
+    const n = nextActive(S.idx);
+    if (n < 0) { stop(); return; }
+    S.idx = n;
+    render(true);
+  };
+  tick();
+  S.timer = setInterval(tick, Number($('speed').value));
+}
+
+function step(delta) {
+  if (!S.battle) return;
+  stop();
+  const last = S.battle.snapshots.length - 1;
+  const next = Math.max(0, Math.min(last, S.idx + delta));
+  if (next === S.idx) return;
+  S.idx = next;
+  render(delta > 0);
+}
+
+async function setOrders(name) {
+  if (!S.battle) return;
+  const last = S.battle.snapshots.length - 1;
+  if (S.idx >= last) { toast('The battle is over. Step back or start a new battle to give new orders.'); return; }
+  const t = S.battle.snapshots[S.idx].turn + 1;
+  if (ordersFor(t) === name) return;
+  planKeys().forEach(k => { if (k >= t) delete S.plan[k]; });
+  if (ordersFor(t) !== name) S.plan[t] = name;
+  await loadBattle(false);
+}
+
+function newBattle() {
+  stop();
+  const v = parseInt($('seed').value, 10);
+  S.seed = Number.isNaN(v) ? 42 : v;
+  S.red = $('red').value;
+  S.plan = {};
+  S.idx = 0;
+  loadBattle(false);
+}
+
+async function runCompare() {
+  const runs = Math.max(1, Math.min(2000, parseInt($('runs').value, 10) || 300));
+  const btn = $('btnCompare');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+  try {
+    const rows = await api('/api/compare?runs=' + runs + '&seed=1');
+    renderMatrix(rows, runs);
+  } catch (e) { toast(e.message); }
+  btn.disabled = false;
+  btn.textContent = 'Run comparison';
+}
+
+function renderMatrix(rows, runs) {
+  const names = ['Aggressive', 'Defensive', 'Balanced'];
+  let html = '<table class="matrix"><tr><th>Blue ↓ &nbsp; Red →</th>' + names.map(n => '<th>' + n + '</th>').join('') + '</tr>';
+  names.forEach(b => {
+    html += '<tr><th>' + b + '</th>';
+    names.forEach(r => {
+      const m = rows.find(x => x.blue === b && x.red === r);
+      const rate = m ? m.blueWinRate : 0;
+      const bg = 'rgba(47,95,208,' + (0.12 + rate * 0.75).toFixed(2) + ')';
+      const fg = rate > 0.55 ? '#fff' : 'inherit';
+      html += '<td data-b="' + b + '" data-r="' + r + '" style="background:' + bg + ';color:' + fg + '">' +
+              '<b>' + (rate * 100).toFixed(0) + '%</b><span>avg ' + (m ? m.avgTurns.toFixed(1) : '-') + ' turns</span></td>';
+    });
+    html += '</tr>';
+  });
+  html += '</table>';
+  $('matrix').innerHTML = html;
+  $('matrixNote').textContent = runs + ' battles per pairing. Simplified combat model with fictional units and greedy movement.';
+  document.querySelectorAll('#matrix td').forEach(td => {
+    td.onclick = () => {
+      S.base = td.dataset.b;
+      $('red').value = td.dataset.r;
+      newBattle();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+  });
+}
+
+$('btnPlay').onclick = () => { S.timer ? stop() : play(); };
+$('btnNext').onclick = () => step(1);
+$('btnPrev').onclick = () => step(-1);
+$('btnReset').onclick = () => { stop(); S.idx = 0; render(false); };
+$('slider').oninput = () => { stop(); S.idx = Number($('slider').value); render(false); };
+$('speed').onchange = () => { if (S.timer) { stop(); play(); } };
+$('btnNew').onclick = newBattle;
+$('btnRandom').onclick = () => { $('seed').value = Math.floor(Math.random() * 999999) + 1; newBattle(); };
+$('btnCompare').onclick = runCompare;
+$('red').onchange = newBattle;
+document.querySelectorAll('.order').forEach(btn => { btn.onclick = () => setOrders(btn.dataset.s); });
+
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+  const k = e.key.toLowerCase();
+  if (e.key === ' ') { e.preventDefault(); S.timer ? stop() : play(); }
+  else if (e.key === 'ArrowRight') step(1);
+  else if (e.key === 'ArrowLeft') step(-1);
+  else if (k === 'a') setOrders('Aggressive');
+  else if (k === 'd') setOrders('Defensive');
+  else if (k === 'b') setOrders('Balanced');
+});
+
+loadBattle(false).then(runCompare);
+</script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WarSim report</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1f1f1c;--muted:#6b6b66;--card:#ffffff;--line:#deded8;
+--blue:#2f5fd0;--red:#cc3b2f;--draw:#a8a8a0;--p:#f3f3ee;--f:#d5e8cf;--h:#ecdcb8;--w:#cfe3f3;--good:#3a8a3a;--warn:#c98a00;--bad:#cc3b2f}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--fg:#ececE6;--muted:#9a9a93;--card:#202020;--line:#3a3a36;
+--blue:#6b8fff;--red:#ff6b5e;--draw:#6f6f69;--p:#2a2a27;--f:#2c4a2c;--h:#4d4129;--w:#27465e;--good:#5fbf5f;--warn:#e0a82e;--bad:#ff6b5e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+header,main{max-width:980px;margin:0 auto;padding:0 20px}
+header{padding-top:28px}
+h1{margin:0;font-size:26px}
+h2{margin:0 0 14px;font-size:18px}
+#sub{color:var(--muted);margin:4px 0 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin:20px 0}
+.replay{display:flex;gap:28px;flex-wrap:wrap}
+#grid{display:grid;gap:3px;width:max-content;max-width:100%}
+.cell{width:44px;height:44px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;background:var(--p);color:var(--muted)}
+.cell.tF{background:var(--f);color:var(--good)}
+.cell.tH{background:var(--h);color:var(--warn)}
+.cell.tW{background:var(--w);color:var(--blue)}
+.cell.unit{color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.cell.unit.blue{background:var(--blue)}
+.cell.unit.red{background:var(--red)}
+.legend{color:var(--muted);font-size:13px;margin-top:10px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
+button,select{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+input[type=range]{width:200px}
+#units{min-width:280px;flex:1}
+.unitrow{display:grid;grid-template-columns:130px 1fr 60px;gap:8px;align-items:center;margin:6px 0;font-size:14px}
+.unitrow.dead{opacity:.4}
+.unitrow .name.blue{color:var(--blue);font-weight:600}
+.unitrow .name.red{color:var(--red);font-weight:600}
+.hp{height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.hp span{display:block;height:100%}
+#events{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;font-size:14px;min-height:60px}
+#events div{padding:1px 0}
+#events .Death{color:var(--bad);font-weight:600}
+#events .Move{color:var(--muted)}
+.mcrow{margin:14px 0}
+.mclabel{font-weight:600;margin-bottom:4px}
+.stack{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--line)}
+.stack .b{background:var(--blue)}.stack .r{background:var(--red)}.stack .d{background:var(--draw)}
+.mcnums{color:var(--muted);font-size:13px;margin-top:3px}
+.note{color:var(--muted);font-size:13px}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;color:#fff;font-weight:600;font-size:13px}
+.badge.Blue{background:var(--blue)}.badge.Red{background:var(--red)}.badge.Draw{background:var(--draw)}
+</style>
+</head>
+<body>
+<header>
+<h1>WarSim report</h1>
+<p id="sub"></p>
+</header>
+<main>
+<section class="card">
+<h2>Battle replay</h2>
+<div class="replay">
+<div>
+<div id="grid"></div>
+<div class="legend">I infantry &nbsp; A armor &nbsp; S recon &nbsp; ♣ forest &nbsp; ▲ hills &nbsp; ≈ water</div>
+<div class="controls">
+<button id="prev">&#9664;</button>
+<button id="play">Play</button>
+<button id="next">&#9654;</button>
+<input type="range" id="slider" min="0" value="0">
+<select id="speed"><option value="1000">Slow</option><option value="600" selected>Normal</option><option value="250">Fast</option></select>
+<span id="turnlabel"></span>
+</div>
+</div>
+<div id="units"></div>
+</div>
+<div id="events"></div>
+</section>
+<section class="card">
+<h2>Strategy comparison</h2>
+<div id="mc"></div>
+<p class="note" id="mcnote"></p>
+</section>
+</main>
+<script>
+const D = {"scenario":"Open Field","seed":42,"blueStrategy":"Defensive","redStrategy":"Aggressive","winner":"Blue","turnsPlayed":30,"turnLimit":30,"blueCasualties":1,"redCasualties":2,"map":["PPPWPP","PPFWPP","PPFPPP","PPPHPP","PPPHPP"],"snapshots":[{"turn":0,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":0,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":1,"y":2},"health":120,"maxHealth":120},{"name":"Blue Recon 3","side":"Blue","unitType":"Recon","position":{"x":0,"y":3},"health":60,"maxHealth":60},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":5,"y":1},"health":100,"maxHealth":100},{"name":"Red Armor 5","side":"Red","unitType":"Armor","position":{"x":4,"y":2},"health":120,"maxHealth":120},{"name":"Red Recon 6","side":"Red","unitType":"Recon","position":{"x":5,"y":3},"health":60,"maxHealth":60}]},{"turn":1,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":120,"maxHealth":120},{"name":"Blue Recon 3","side":"Blue","unitType":"Recon","position":{"x":3,"y":3},"health":29,"maxHealth":60},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100},{"name":"Red Armor 5","side":"Red","unitType":"Armor","position":{"x":4,"y":2},"health":91,"maxHealth":120},{"name":"Red Recon 6","side":"Red","unitType":"Recon","position":{"x":5,"y":3},"health":54,"maxHealth":60}]},{"turn":2,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":120,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100},{"name":"Red Armor 5","side":"Red","unitType":"Armor","position":{"x":4,"y":2},"health":61,"maxHealth":120},{"name":"Red Recon 6","side":"Red","unitType":"Recon","position":{"x":5,"y":3},"health":54,"maxHealth":60}]},{"turn":3,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":97,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100},{"name":"Red Armor 5","side":"Red","unitType":"Armor","position":{"x":4,"y":2},"health":34,"maxHealth":120},{"name":"Red Recon 6","side":"Red","unitType":"Recon","position":{"x":3,"y":3},"health":54,"maxHealth":60}]},{"turn":4,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":75,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100},{"name":"Red Armor 5","side":"Red","unitType":"Armor","position":{"x":4,"y":2},"health":7,"maxHealth":120},{"name":"Red Recon 6","side":"Red","unitType":"Recon","position":{"x":3,"y":3},"health":54,"maxHealth":60}]},{"turn":5,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":74,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100},{"name":"Red Recon 6","side":"Red","unitType":"Recon","position":{"x":3,"y":3},"health":54,"maxHealth":60}]},{"turn":6,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":73,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100},{"name":"Red Recon 6","side":"Red","unitType":"Recon","position":{"x":3,"y":3},"health":24,"maxHealth":60}]},{"turn":7,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":69,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100},{"name":"Red Recon 6","side":"Red","unitType":"Recon","position":{"x":3,"y":3},"health":1,"maxHealth":60}]},{"turn":8,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":9,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":10,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":11,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":12,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":13,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":14,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":15,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":16,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":17,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":18,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":19,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":20,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":21,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":22,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":23,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":24,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":25,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":26,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":27,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":28,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":29,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]},{"turn":30,"units":[{"name":"Blue Infantry 1","side":"Blue","unitType":"Infantry","position":{"x":2,"y":1},"health":100,"maxHealth":100},{"name":"Blue Armor 2","side":"Blue","unitType":"Armor","position":{"x":2,"y":2},"health":67,"maxHealth":120},{"name":"Red Infantry 4","side":"Red","unitType":"Infantry","position":{"x":4,"y":1},"health":100,"maxHealth":100}]}],"events":[{"turn":1,"eventType":"Move","unitName":"Blue Infantry 1","targetName":null,"damage":null,"description":"Blue Infantry 1 moved (0,1) -\u003E (2,1)"},{"turn":1,"eventType":"Move","unitName":"Blue Armor 2","targetName":null,"damage":null,"description":"Blue Armor 2 moved (1,2) -\u003E (2,2)"},{"turn":1,"eventType":"Attack","unitName":"Blue Armor 2","targetName":"Red Armor 5","damage":29,"description":"Blue Armor 2 hit Red Armor 5 for 29 (health 91)"},{"turn":1,"eventType":"Move","unitName":"Blue Recon 3","targetName":null,"damage":null,"description":"Blue Recon 3 moved (0,3) -\u003E (3,3)"},{"turn":1,"eventType":"Attack","unitName":"Blue Recon 3","targetName":"Red Recon 6","damage":6,"description":"Blue Recon 3 hit Red Recon 6 for 6 (health 54)"},{"turn":1,"eventType":"Move","unitName":"Red Infantry 4","targetName":null,"damage":null,"description":"Red Infantry 4 moved (5,1) -\u003E (4,1)"},{"turn":1,"eventType":"Attack","unitName":"Red Armor 5","targetName":"Blue Recon 3","damage":24,"description":"Red Armor 5 hit Blue Recon 3 for 24 (health 36)"},{"turn":1,"eventType":"Attack","unitName":"Red Recon 6","targetName":"Blue Recon 3","damage":7,"description":"Red Recon 6 hit Blue Recon 3 for 7 (health 29)"},{"turn":2,"eventType":"Attack","unitName":"Red Armor 5","targetName":"Blue Recon 3","damage":25,"description":"Red Armor 5 hit Blue Recon 3 for 25 (health 4)"},{"turn":2,"eventType":"Attack","unitName":"Red Recon 6","targetName":"Blue Recon 3","damage":5,"description":"Red Recon 6 hit Blue Recon 3 for 5 (health 0)"},{"turn":2,"eventType":"Death","unitName":"Blue Recon 3","targetName":null,"damage":null,"description":"Blue Recon 3 was destroyed"},{"turn":2,"eventType":"Attack","unitName":"Blue Armor 2","targetName":"Red Armor 5","damage":30,"description":"Blue Armor 2 hit Red Armor 5 for 30 (health 61)"},{"turn":3,"eventType":"Attack","unitName":"Blue Armor 2","targetName":"Red Armor 5","damage":27,"description":"Blue Armor 2 hit Red Armor 5 for 27 (health 34)"},{"turn":3,"eventType":"Attack","unitName":"Red Armor 5","targetName":"Blue Armor 2","damage":20,"description":"Red Armor 5 hit Blue Armor 2 for 20 (health 100)"},{"turn":3,"eventType":"Move","unitName":"Red Recon 6","targetName":null,"damage":null,"description":"Red Recon 6 moved (5,3) -\u003E (3,3)"},{"turn":3,"eventType":"Attack","unitName":"Red Recon 6","targetName":"Blue Armor 2","damage":3,"description":"Red Recon 6 hit Blue Armor 2 for 3 (health 97)"},{"turn":4,"eventType":"Attack","unitName":"Red Armor 5","targetName":"Blue Armor 2","damage":21,"description":"Red Armor 5 hit Blue Armor 2 for 21 (health 76)"},{"turn":4,"eventType":"Attack","unitName":"Red Recon 6","targetName":"Blue Armor 2","damage":1,"description":"Red Recon 6 hit Blue Armor 2 for 1 (health 75)"},{"turn":4,"eventType":"Attack","unitName":"Blue Armor 2","targetName":"Red Armor 5","damage":27,"description":"Blue Armor 2 hit Red Armor 5 for 27 (health 7)"},{"turn":5,"eventType":"Attack","unitName":"Blue Armor 2","targetName":"Red Armor 5","damage":24,"description":"Blue Armor 2 hit Red Armor 5 for 24 (health 0)"},{"turn":5,"eventType":"Death","unitName":"Red Armor 5","targetName":null,"damage":null,"description":"Red Armor 5 was destroyed"},{"turn":5,"eventType":"Attack","unitName":"Red Recon 6","targetName":"Blue Armor 2","damage":1,"description":"Red Recon 6 hit Blue Armor 2 for 1 (health 74)"},{"turn":6,"eventType":"Attack","unitName":"Red Recon 6","targetName":"Blue Armor 2","damage":1,"description":"Red Recon 6 hit Blue Armor 2 for 1 (health 73)"},{"turn":6,"eventType":"Attack","unitName":"Blue Armor 2","targetName":"Red Recon 6","damage":30,"description":"Blue Armor 2 hit Red Recon 6 for 30 (health 24)"},{"turn":7,"eventType":"Attack","unitName":"Blue Armor 2","targetName":"Red Recon 6","damage":23,"description":"Blue Armor 2 hit Red Recon 6 for 23 (health 1)"},{"turn":7,"eventType":"Attack","unitName":"Red Recon 6","targetName":"Blue Armor 2","damage":4,"description":"Red Recon 6 hit Blue Armor 2 for 4 (health 69)"},{"turn":8,"eventType":"Attack","unitName":"Red Recon 6","targetName":"Blue Armor 2","damage":2,"description":"Red Recon 6 hit Blue Armor 2 for 2 (health 67)"},{"turn":8,"eventType":"Attack","unitName":"Blue Armor 2","targetName":"Red Recon 6","damage":28,"description":"Blue Armor 2 hit Red Recon 6 for 28 (health 0)"},{"turn":8,"eventType":"Death","unitName":"Red Recon 6","targetName":null,"damage":null,"description":"Red Recon 6 was destroyed"}],"monteCarlo":[{"blue":"Aggressive","red":"Aggressive","runs":500,"blueWins":422,"redWins":78,"draws":0,"blueWinRate":0.844,"redWinRate":0.156,"avgTurns":11.55,"stdDevTurns":0.6866585760041144},{"blue":"Aggressive","red":"Defensive","runs":500,"blueWins":393,"redWins":107,"draws":0,"blueWinRate":0.786,"redWinRate":0.214,"avgTurns":17.556,"stdDevTurns":3.4731633995537825},{"blue":"Defensive","red":"Aggressive","runs":500,"blueWins":422,"redWins":78,"draws":0,"blueWinRate":0.844,"redWinRate":0.156,"avgTurns":27.23,"stdDevTurns":6.448961156651517},{"blue":"Defensive","red":"Defensive","runs":500,"blueWins":291,"redWins":209,"draws":0,"blueWinRate":0.582,"redWinRate":0.418,"avgTurns":20.438,"stdDevTurns":4.294433140706702}]};
+const W = D.map[0].length, H = D.map.length;
+const last = D.snapshots.length - 1;
+const active = new Set(D.events.map(e => e.turn));
+let idx = 0, timer = null;
+
+const grid = document.getElementById('grid');
+grid.style.gridTemplateColumns = 'repeat(' + W + ', 44px)';
+const slider = document.getElementById('slider');
+slider.max = last;
+
+function letter(t) { return {Infantry: 'I', Armor: 'A', Recon: 'S'}[t] || '?'; }
+
+function render() {
+  const snap = D.snapshots[idx];
+  grid.innerHTML = '';
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const t = D.map[y][x];
+      const u = snap.units.find(u => u.position.x === x && u.position.y === y);
+      const c = document.createElement('div');
+      c.className = 'cell t' + t + (u ? ' unit ' + u.side.toLowerCase() : '');
+      c.textContent = u ? letter(u.unitType) : ({F: '♣', H: '▲', W: '≈'}[t] || '');
+      grid.appendChild(c);
+    }
+  }
+
+  const unitsEl = document.getElementById('units');
+  unitsEl.innerHTML = '';
+  D.snapshots[0].units.forEach(start => {
+    const now = snap.units.find(u => u.name === start.name);
+    const row = document.createElement('div');
+    row.className = 'unitrow' + (now ? '' : ' dead');
+    const pct = now ? now.health / now.maxHealth : 0;
+    const color = pct > 0.5 ? 'var(--good)' : pct > 0.25 ? 'var(--warn)' : 'var(--bad)';
+    row.innerHTML =
+      '<div class="name ' + start.side.toLowerCase() + '">' + letter(start.unitType) + ' ' + start.name + '</div>' +
+      '<div class="hp"><span style="width:' + (pct * 100) + '%;background:' + color + '"></span></div>' +
+      '<div>' + (now ? now.health + '/' + now.maxHealth : 'destroyed') + '</div>';
+    unitsEl.appendChild(row);
+  });
+
+  const ev = document.getElementById('events');
+  ev.innerHTML = '';
+  if (snap.turn === 0) {
+    ev.innerHTML = '<div class="Move">Start of battle</div>';
+  } else {
+    const list = D.events.filter(e => e.turn === snap.turn);
+    if (list.length === 0) ev.innerHTML = '<div class="Move">Nothing happened this turn</div>';
+    list.forEach(e => {
+      const d = document.createElement('div');
+      d.className = e.eventType;
+      d.textContent = e.description;
+      ev.appendChild(d);
+    });
+  }
+
+  document.getElementById('turnlabel').textContent = 'Turn ' + snap.turn + ' / ' + D.turnLimit;
+  slider.value = idx;
+}
+
+function nextActive(i) {
+  for (let j = i + 1; j <= last; j++) if (active.has(D.snapshots[j].turn)) return j;
+  return -1;
+}
+
+function stop() {
+  if (timer) clearInterval(timer);
+  timer = null;
+  document.getElementById('play').textContent = 'Play';
+}
+
+function start() {
+  if (nextActive(idx) === -1) idx = 0;
+  render();
+  document.getElementById('play').textContent = 'Pause';
+  timer = setInterval(() => {
+    const n = nextActive(idx);
+    if (n < 0) { stop(); return; }
+    idx = n;
+    render();
+  }, Number(document.getElementById('speed').value));
+}
+
+document.getElementById('play').onclick = () => { timer ? stop() : start(); };
+document.getElementById('prev').onclick = () => { stop(); idx = Math.max(0, idx - 1); render(); };
+document.getElementById('next').onclick = () => { stop(); idx = Math.min(last, idx + 1); render(); };
+slider.oninput = () => { stop(); idx = Number(slider.value); render(); };
+document.getElementById('speed').onchange = () => { if (timer) { stop(); start(); } };
+
+const lastActive = active.size ? Math.max(...active) : 0;
+let sub = D.scenario + ' · seed ' + D.seed + ' · Blue ' + D.blueStrategy + ' vs Red ' + D.redStrategy +
+  ' · winner <span class="badge ' + D.winner + '">' + D.winner + '</span>' +
+  ' · ' + D.turnsPlayed + ' turns (Blue lost ' + D.blueCasualties + ', Red lost ' + D.redCasualties + ')';
+if (D.turnsPlayed > lastActive) sub += '<br>No more action after turn ' + lastActive + '. The battle ran to the turn limit, so the winner is decided by remaining health.';
+document.getElementById('sub').innerHTML = sub;
+
+const mc = document.getElementById('mc');
+D.monteCarlo.forEach(m => {
+  const row = document.createElement('div');
+  row.className = 'mcrow';
+  const drawPct = m.draws / m.runs * 100;
+  row.innerHTML =
+    '<div class="mclabel">Blue ' + m.blue + ' vs Red ' + m.red + '</div>' +
+    '<div class="stack"><span class="b" style="width:' + (m.blueWinRate * 100) + '%"></span>' +
+    '<span class="d" style="width:' + drawPct + '%"></span>' +
+    '<span class="r" style="width:' + (m.redWinRate * 100) + '%"></span></div>' +
+    '<div class="mcnums">Blue ' + (m.blueWinRate * 100).toFixed(1) + '% · Red ' + (m.redWinRate * 100).toFixed(1) +
+    '% · Draw ' + drawPct.toFixed(1) + '% · average ' + m.avgTurns.toFixed(1) + ' turns</div>';
+  mc.appendChild(row);
+});
+document.getElementById('mcnote').textContent =
+  (D.monteCarlo.length ? D.monteCarlo[0].runs : 0) + ' battles per pairing. Simplified combat model with fictional units and greedy movement.';
+
+render();
+</script>
+</body>
+</html>

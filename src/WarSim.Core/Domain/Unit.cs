@@ -7,6 +7,7 @@ public abstract class Unit
     public Side Side { get; }
     public Position Position { get; set; }
     public int Health { get; private set; }
+    public int MaxHealth { get; }
     public int Movement { get; }
     public int AttackRange { get; }
     public int Attack { get; }
@@ -22,6 +23,7 @@ public abstract class Unit
         Side = side;
         Position = position;
         Health = health;
+        MaxHealth = health;
         Movement = movement;
         AttackRange = attackRange;
         Attack = attack;
