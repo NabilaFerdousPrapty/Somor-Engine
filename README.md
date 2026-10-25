@@ -14,7 +14,7 @@ to **MySQL**.
 
 **Live demo:** `https://somor-engine.onrender.com` (the first load may take up to a minute on the free host)
 
-![WarSim web page](docs/screenshot.png)
+![WarSim web page](demo/image.png)
 
 ---
 
