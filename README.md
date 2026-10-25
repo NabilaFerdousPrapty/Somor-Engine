@@ -163,8 +163,8 @@ WarSim/
 ### Get the code, build and test
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/WarSim.git
-cd WarSim
+git clone https://github.com/NabilaFerdousPrapty/Somor-Engine
+cd Somor-Engine
 dotnet build
 dotnet test
 ```
